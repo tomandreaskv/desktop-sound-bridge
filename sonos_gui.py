@@ -5,6 +5,7 @@ import os
 import sys
 import hmac
 import secrets
+import queue
 import soundcard as sc
 from soundcard.mediafoundation import SoundcardRuntimeWarning
 import numpy as np
@@ -48,6 +49,7 @@ CHANNELS = 2
 BLOCK_SIZE = 4096  # Litt større buffer for jevnere avspilling
 
 STREAM_TOKEN = secrets.token_urlsafe(32)
+audio_errors = queue.SimpleQueue()
 
 
 # ==========================================
@@ -84,7 +86,7 @@ def generate_audio_stream():
     try:
         mic = sc.get_microphone(sc.default_speaker().name, include_loopback=True)
     except Exception as e:
-        print(f"Kunne ikke finne loopback-enhet: {e}")
+        audio_errors.put(f"Kunne ikke finne loopback-enhet: {e}")
         return
 
     yield get_wav_header(SAMPLE_RATE, CHANNELS, 16)
@@ -96,7 +98,7 @@ def generate_audio_stream():
                 audio_data = (data * 32767).astype(np.int16)
                 yield audio_data.tobytes()
     except Exception as e:
-        print(f"Feil under opptak: {e}")
+        audio_errors.put(f"Feil under opptak: {e}")
 
 
 # ==========================================
@@ -189,9 +191,26 @@ class SonosApp:
         if not self.server_ready:
             self.btn_start.config(state="disabled")
 
+        self.audio_error_poll_id = self.root.after(250, self._poll_audio_errors)
         self.scan_speakers()
 
+    def _poll_audio_errors(self):
+        try:
+            error = audio_errors.get_nowait()
+        except queue.Empty:
+            error = None
+
+        if error is not None:
+            self.status_label.config(text="Lydstrømmen stoppet på grunn av en feil.")
+            self.btn_start.config(state="normal" if self.server_ready else "disabled")
+            self.btn_stop.config(state="disabled")
+            self.combo_speakers.config(state="readonly")
+            messagebox.showerror("Lydopptak feilet", error)
+
+        self.audio_error_poll_id = self.root.after(250, self._poll_audio_errors)
+
     def close_app(self):
+        self.root.after_cancel(self.audio_error_poll_id)
         if self.server is not None:
             self.server.shutdown()
             self.server.server_close()

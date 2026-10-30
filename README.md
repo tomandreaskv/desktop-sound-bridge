@@ -44,6 +44,8 @@ Kjør testene fra prosjektmappen:
 python -m unittest discover -s tests
 ```
 
+GitHub Actions kjører de samme testene på Windows ved push til `main`, pull requests mot `main` og ved manuell kjøring.
+
 ## Bygg Windows-programmet
 
 Installer PyInstaller og bygg med den medfølgende spec-filen:
