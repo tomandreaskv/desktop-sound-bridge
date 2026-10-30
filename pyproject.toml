@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "desktop-sound-bridge"
+version = "0.1.0b1"
+description = "Stream Windows PC audio to Sonos speakers on the local network"
+license = "MIT"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.13,<3.14"
+flask = "^3.1.3"
+werkzeug = "^3.1.9"
+soundcard = "^0.4.6"
+numpy = "^2.5.4"
+soco = "^0.32.0"
+
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "^6.22.3"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

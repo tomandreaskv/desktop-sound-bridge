@@ -17,11 +17,12 @@ Strømmeserveren lytter på PC-ens valgte lokale nettverksadresse og krever en t
 
 ---
 
-## 🛠️ Forutsetninger og Biblioteker
-For å kjøre dette skriptet fra kildekoden trenger du Python installert sammen med følgende avhengigheter:
+## Forutsetninger og installasjon
+
+Installer Python 3.13 og [Poetry](https://python-poetry.org/). Kjør så følgende fra prosjektmappen for å opprette et virtuelt miljø og installere de låste avhengighetene:
 
 ```powershell
-python -m pip install flask soundcard numpy soco
+poetry sync
 ```
 
 ## Slik kjører du programmet
@@ -31,7 +32,7 @@ python -m pip install flask soundcard numpy soco
 3. Start programmet med Python:
 
 ```powershell
-python sonos_gui.py
+poetry run python sonos_gui.py
 ```
 
 4. Velg ønsket Sonos-høyttaler i nedtrekksmenyen og trykk Start Strømming.
@@ -41,18 +42,17 @@ python sonos_gui.py
 Kjør testene fra prosjektmappen:
 
 ```powershell
-python -m unittest discover -s tests
+poetry run python -m unittest discover -s tests
 ```
 
 GitHub Actions kjører de samme testene på Windows ved push til `main`, pull requests mot `main` og ved manuell kjøring.
 
 ## Bygg Windows-programmet
 
-Installer PyInstaller og bygg med den medfølgende spec-filen:
+PyInstaller er inkludert som en utviklingsavhengighet. Bygg med den medfølgende spec-filen:
 
 ```powershell
-python -m pip install pyinstaller
-python -m PyInstaller DesktopSoundBridge.spec
+poetry run pyinstaller DesktopSoundBridge.spec
 ```
 
 Den kjørbare filen blir lagt i `dist`. Test den bygde filen på en Windows-maskin med Sonos før du distribuerer den.

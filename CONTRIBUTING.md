@@ -12,10 +12,16 @@ Takk for at du har lyst til å bidra til dette prosjektet! Alle bidrag (feilrett
 
 ## Utviklingsmiljø
 
-For å kjøre koden fra kildekoden trenger du Python installert, samt følgende avhengigheter:
+Installer Python 3.13 og Poetry. Installer prosjektets låste avhengigheter fra prosjektmappen:
 
 ```powershell
-pip install flask soundcard numpy soco
+poetry sync
+```
+
+Kjør testene med:
+
+```powershell
+poetry run python -m unittest discover -s tests
 ```
 
 ## Bygge .exe-fil lokalt
@@ -23,7 +29,7 @@ pip install flask soundcard numpy soco
 Hvis du vil teste å bygge den kjørbare fila selv, kan du bruke PyInstaller-spec-fila som følger med:
 
 ```powershell
-python -m PyInstaller DesktopSoundBridge.spec
+poetry run pyinstaller DesktopSoundBridge.spec
 ```
 
 Takk for at du hjelper til med å gjøre programmet bedre!

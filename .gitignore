@@ -1,6 +1,7 @@
 # Python cache og midlertidige filer
 __pycache__/
 *.pyc
+.venv/
 
 # PyInstaller mapper (hvis du lager .exe-filer senere)
 build/
