@@ -12,7 +12,7 @@ Takk for at du har lyst til å bidra til dette prosjektet! Alle bidrag (feilrett
 
 ## Utviklingsmiljø
 
-Installer Python 3.13 og Poetry. Installer prosjektets låste avhengigheter fra prosjektmappen:
+Installer Python 3.13 og Poetry. Prosjektets lokale Poetry-innstilling oppretter miljøet i `.venv` i prosjektmappen. Installer prosjektets låste avhengigheter derfra:
 
 ```powershell
 poetry sync

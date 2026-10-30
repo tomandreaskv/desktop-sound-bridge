@@ -19,11 +19,13 @@ Strømmeserveren lytter på PC-ens valgte lokale nettverksadresse og krever en t
 
 ## Forutsetninger og installasjon
 
-Installer Python 3.13 og [Poetry](https://python-poetry.org/). Kjør så følgende fra prosjektmappen for å opprette et virtuelt miljø og installere de låste avhengighetene:
+Installer Python 3.13 og [Poetry](https://python-poetry.org/). Prosjektet bruker et lokalt virtuelt miljø i `.venv`-mappen; avhengighetene installeres ikke globalt. Kjør følgende fra prosjektmappen for å opprette miljøet og installere de låste avhengighetene:
 
 ```powershell
 poetry sync
 ```
+
+Poetry bruker Python 3.13 som basis for det isolerte miljøet. Du kan kontrollere miljøstien med `poetry env info --path`.
 
 ## Slik kjører du programmet
 
