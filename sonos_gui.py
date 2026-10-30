@@ -1,16 +1,18 @@
 import threading
-import time
 import socket
 import warnings
 import os
 import sys
+import hmac
+import secrets
 import soundcard as sc
 from soundcard.mediafoundation import SoundcardRuntimeWarning
 import numpy as np
 import soco
 import tkinter as tk
 from tkinter import ttk, messagebox
-from flask import Flask, Response
+from flask import Flask, Response, request
+from werkzeug.serving import make_server
 
 # ==========================================
 # 0. INNSTILLINGER, LOGO OG FEILAVHJELPING
@@ -23,7 +25,7 @@ def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, relative_path)
 
 ICON_PATH = resource_path("logo-2.ico")
@@ -35,23 +37,17 @@ ICON_PATH = resource_path("logo-2.ico")
 app = Flask(__name__)
 
 def get_local_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
+        return s.getsockname()[0]
 
-LOCAL_IP = get_local_ip()
 PORT = 5000
 
 SAMPLE_RATE = 44100
 CHANNELS = 2
 BLOCK_SIZE = 4096  # Litt større buffer for jevnere avspilling
 
-speakers_dict = {}
+STREAM_TOKEN = secrets.token_urlsafe(32)
 
 
 # ==========================================
@@ -109,10 +105,13 @@ def generate_audio_stream():
 
 @app.route('/stream.wav')
 def live_stream():
+    token = request.args.get("token", "")
+    if not hmac.compare_digest(token, STREAM_TOKEN):
+        return Response(status=401)
     return Response(generate_audio_stream(), mimetype="audio/x-wav")
 
-def start_server():
-    app.run(host='0.0.0.0', port=PORT, threaded=True)
+def start_server(server):
+    server.serve_forever()
 
 
 # ==========================================
@@ -120,8 +119,12 @@ def start_server():
 # ==========================================
 
 class SonosApp:
-    def __init__(self, root):
+    def __init__(self, root, local_ip, server):
         self.root = root
+        self.local_ip = local_ip
+        self.server = server
+        self.server_ready = server is not None
+        self.speakers_dict = {}
         self.root.title("Desktop Sound Bridge")
         self.root.geometry("420x390")
         self.root.resizable(False, False)
@@ -136,7 +139,7 @@ class SonosApp:
         menubar = tk.Menu(root)
         
         file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label="Avslutt", command=root.quit)
+        file_menu.add_command(label="Avslutt", command=self.close_app)
         menubar.add_cascade(label="Fil", menu=file_menu)
         
         help_menu = tk.Menu(menubar, tearoff=0)
@@ -178,40 +181,60 @@ class SonosApp:
         self.btn_stop.pack(side="right", expand=True, fill="x", padx=5)
 
         # --- Statusfelt ---
-        self.status_label = ttk.Label(root, text=f"IP: {LOCAL_IP} | Klar", font=("Arial", 9, "italic"))
+        status = f"IP: {local_ip} | Klar" if self.server_ready else "Strømming utilgjengelig"
+        self.status_label = ttk.Label(root, text=status, font=("Arial", 9, "italic"))
         self.status_label.pack(pady=10)
 
+        self.btn_scan = btn_scan
+        if not self.server_ready:
+            self.btn_start.config(state="disabled")
+
         self.scan_speakers()
+
+    def close_app(self):
+        if self.server is not None:
+            self.server.shutdown()
+            self.server.server_close()
+        self.root.destroy()
 
     def show_about(self):
         messagebox.showinfo(
             "Om programmet",
-            "Desktop Sound Bridge v1.0\n\n"
+            "Desktop Sound Bridge v0.1.0-beta.1\n\n"
             "Lar deg streame live systemlyd fra din Windows-PC "
             "direkte til Sonos-høyttalere på det lokale nettverket."
         )
 
     def scan_speakers(self):
         self.status_label.config(text="Søker etter Sonos-enheter...")
-        self.root.update()
-        
-        global speakers_dict
-        speakers_dict.clear()
-        
-        try:
-            found = list(soco.discover())
-            if found:
-                for sp in found:
-                    speakers_dict[sp.player_name] = sp
-                
-                self.combo_speakers['values'] = list(speakers_dict.keys())
-                self.combo_speakers.current(0)
-                self.status_label.config(text=f"Fant {len(found)} enhet(er).")
-            else:
-                self.status_label.config(text="Fant ingen Sonos-enheter.")
-        except Exception as e:
+        self.btn_scan.config(state="disabled")
+
+        def discover_speakers():
+            try:
+                found = list(soco.discover())
+            except Exception as e:
+                self.root.after(0, self._finish_scan, None, e)
+                return
+            self.root.after(0, self._finish_scan, found, None)
+
+        threading.Thread(target=discover_speakers, daemon=True).start()
+
+    def _finish_scan(self, found, error):
+        self.btn_scan.config(state="normal")
+        if error is not None:
             self.status_label.config(text="Feil under søk.")
-            messagebox.showerror("Feil", f"Kunne ikke søke etter enheter:\n{e}")
+            messagebox.showerror("Feil", f"Kunne ikke søke etter enheter:\n{error}")
+            return
+
+        self.speakers_dict = {sp.player_name: sp for sp in found}
+        names = list(self.speakers_dict.keys())
+        self.combo_speakers["values"] = names
+        if names:
+            self.combo_speakers.current(0)
+            self.status_label.config(text=f"Fant {len(names)} enhet(er).")
+        else:
+            self.combo_speakers.set("")
+            self.status_label.config(text="Fant ingen Sonos-enheter.")
 
     def start_streaming(self):
         selected_name = self.combo_speakers.get()
@@ -219,42 +242,51 @@ class SonosApp:
             messagebox.showwarning("Advarsel", "Vennligst velg en høyttaler først!")
             return
 
-        target_speaker = speakers_dict.get(selected_name)
-        if target_speaker:
-            try:
-                target_speaker.volume = int(self.vol_slider.get())
-                stream_url = f"http://{LOCAL_IP}:{PORT}/stream.wav"
-                target_speaker.play_uri(stream_url)
-                
-                self.status_label.config(text=f"Spiller av på: {selected_name}")
-                self.btn_start.config(state="disabled")
-                self.btn_stop.config(state="normal")
-                self.combo_speakers.config(state="disabled")
-            except Exception as e:
-                messagebox.showerror("Feil", f"Kunne ikke starte avspilling:\n{e}")
+        target_speaker = self.speakers_dict.get(selected_name)
+        if target_speaker is None:
+            messagebox.showerror("Feil", "Den valgte høyttaleren er ikke lenger tilgjengelig. Søk på nytt.")
+            return
+        if not self.server_ready:
+            messagebox.showerror("Feil", "Strømmeserveren er ikke tilgjengelig.")
+            return
+
+        try:
+            target_speaker.volume = int(self.vol_slider.get())
+            stream_url = f"http://{self.local_ip}:{PORT}/stream.wav?token={STREAM_TOKEN}"
+            target_speaker.play_uri(stream_url)
+
+            self.status_label.config(text=f"Spiller av på: {selected_name}")
+            self.btn_start.config(state="disabled")
+            self.btn_stop.config(state="normal")
+            self.combo_speakers.config(state="disabled")
+        except Exception as e:
+            messagebox.showerror("Feil", f"Kunne ikke starte avspilling:\n{e}")
 
     def stop_streaming(self, *args):
         selected_name = self.combo_speakers.get()
-        target_speaker = speakers_dict.get(selected_name)
-        if target_speaker:
-            try:
-                target_speaker.stop()
-                self.status_label.config(text="Avspilling stoppet.")
-            except:
-                pass
-        
+        target_speaker = self.speakers_dict.get(selected_name)
+        if target_speaker is None:
+            messagebox.showerror("Feil", "Fant ikke den valgte høyttaleren. Søk på nytt.")
+            return
+        try:
+            target_speaker.stop()
+        except Exception as e:
+            messagebox.showerror("Feil", f"Kunne ikke stoppe avspillingen:\n{e}")
+            return
+
+        self.status_label.config(text="Avspilling stoppet.")
         self.btn_start.config(state="normal")
         self.btn_stop.config(state="disabled")
         self.combo_speakers.config(state="readonly")
 
     def change_volume(self, val):
         selected_name = self.combo_speakers.get()
-        target_speaker = speakers_dict.get(selected_name)
+        target_speaker = self.speakers_dict.get(selected_name)
         if target_speaker:
             try:
                 target_speaker.volume = int(float(val))
-            except:
-                pass
+            except Exception as e:
+                self.status_label.config(text=f"Kunne ikke endre volum: {e}")
 
 
 # ==========================================
@@ -262,9 +294,36 @@ class SonosApp:
 # ==========================================
 
 if __name__ == '__main__':
-    server_thread = threading.Thread(target=start_server, daemon=True)
-    server_thread.start()
-
     root = tk.Tk()
-    app = SonosApp(root)
+    local_ip = None
+    server = None
+    startup_error = None
+    try:
+        local_ip = get_local_ip()
+    except OSError as e:
+        startup_error = e
+
+    if local_ip is not None:
+        try:
+            server = make_server(local_ip, PORT, app, threaded=True)
+        except OSError as e:
+            startup_error = e
+
+    sonos_app = SonosApp(root, local_ip, server)
+    if startup_error is not None:
+        message = (
+            f"Kunne ikke finne en lokal nettverksadresse:\n{startup_error}"
+            if local_ip is None
+            else f"Kunne ikke starte strømmeserveren på port {PORT}:\n{startup_error}"
+        )
+        messagebox.showerror(
+            "Strømmeserver utilgjengelig",
+            message,
+        )
+
+    if server is not None:
+        server_thread = threading.Thread(target=start_server, args=(server,), daemon=True)
+        server_thread.start()
+
+    root.protocol("WM_DELETE_WINDOW", sonos_app.close_app)
     root.mainloop()

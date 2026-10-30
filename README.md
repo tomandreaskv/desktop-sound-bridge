@@ -9,16 +9,22 @@ En enkel og brukervennlig desktop-applikasjon skrevet i Python som fanger opp li
 * **Live Volumkontroll:** Juster volumet direkte fra appens skyvebryter.
 * **Dynamisk IP-deteksjon:** Finner maskinens lokale IP-adresse automatisk slik at den fungerer på tvers av nettverk.
 
+## Testrelease
+
+Dette er en første testrelease (`0.1.0-beta.1`), ikke en stabil 1.0.0. Den er foreløpig bare kontrollert med automatiske tester; avspilling bør testes på din Windows-PC og Sonos-modell før daglig bruk.
+
+Strømmeserveren lytter på PC-ens valgte lokale nettverksadresse og krever en tilfeldig nøkkel som genereres ved oppstart. Sonos og PC-en må være på et nettverk der de kan nå hverandre. Brannmurregler kan måtte tillate innkommende trafikk på port 5000.
+
 ---
 
 ## 🛠️ Forutsetninger og Biblioteker
 For å kjøre dette skriptet fra kildekoden trenger du Python installert sammen med følgende avhengigheter:
 
 ```powershell
-pip install flask soundcard numpy soco
+python -m pip install flask soundcard numpy soco
 ```
 
-# 🚀 Slik kjører du programmet
+## Slik kjører du programmet
 
 1. Last ned eller klon dette repositoryet.
 2. Åpne en terminal i prosjektmappen.
@@ -30,6 +36,25 @@ python sonos_gui.py
 
 4. Velg ønsket Sonos-høyttaler i nedtrekksmenyen og trykk Start Strømming.
 
-# 📂 Prosjektstruktur
+## Tester
+
+Kjør testene fra prosjektmappen:
+
+```powershell
+python -m unittest discover -s tests
+```
+
+## Bygg Windows-programmet
+
+Installer PyInstaller og bygg med den medfølgende spec-filen:
+
+```powershell
+python -m pip install pyinstaller
+python -m PyInstaller DesktopSoundBridge.spec
+```
+
+Den kjørbare filen blir lagt i `dist`. Test den bygde filen på en Windows-maskin med Sonos før du distribuerer den.
+
+## Prosjektstruktur
 
 * sonos_gui.py – Hovedprogrammet som inneholder både Flask-serveren, lydopptaket og det grafiske grensesnittet.
