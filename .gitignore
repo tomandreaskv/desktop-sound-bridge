@@ -1,0 +1,8 @@
+# Python cache og midlertidige filer
+__pycache__/
+*.pyc
+
+# PyInstaller mapper (hvis du lager .exe-filer senere)
+build/
+dist/
+*.spec
